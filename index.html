@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>눈바디 — 내 몸 변화 기록</title>
+  <title>EYEBODY — 눈바디 변화 기록</title>
+  <!-- Favicon: eye+figure SVG -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2300C9B1'/%3E%3Cstop offset='100%25' stop-color='%230369A1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cellipse cx='50' cy='50' rx='48' ry='30' fill='none' stroke='url(%23g)' stroke-width='7'/%3E%3Ccircle cx='50' cy='50' r='16' fill='url(%23g)'/%3E%3Cpath d='M50 38 C50 38 44 42 44 50 C44 56 47 60 50 62 C53 60 56 56 56 50 C56 42 50 38 50 38Z' fill='white' opacity='0.9'/%3E%3Cellipse cx='50' cy='44' rx='5' ry='3' fill='white' opacity='0.5'/%3E%3C/svg%3E" />
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -19,6 +21,93 @@
     html { scroll-behavior: smooth; }
     body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; overflow-x: hidden; }
     #root { max-width: 480px; margin: 0 auto; padding-bottom: 60px; }
+
+    /* ── SPLASH ── */
+    .splash {
+      position: fixed; inset: 0; z-index: 9999;
+      background: linear-gradient(160deg, #e0faf6 0%, #b2ecec 30%, #5bc8c8 60%, #0891b2 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 32px 28px;
+      animation: splashFadeOut 0.5s ease 2s forwards;
+    }
+    @keyframes splashFadeOut { to { opacity: 0; pointer-events: none; } }
+
+    .splash-logo-wrap {
+      width: 80px; height: 80px; margin-bottom: 14px;
+    }
+    .splash-logo-svg { width: 100%; height: 100%; }
+
+    .splash-brand {
+      font-size: 36px; font-weight: 900; letter-spacing: 3px;
+      color: #0c4a6e; margin-bottom: 24px;
+    }
+
+    .splash-hero {
+      width: 100%; border-radius: 20px; overflow: hidden;
+      background: linear-gradient(135deg, #0c4a6e 0%, #0369a1 40%, #0e7490 100%);
+      padding: 24px 20px 20px; margin-bottom: 28px;
+      position: relative;
+    }
+    .splash-hero-headline {
+      font-size: 28px; font-weight: 900; color: #fff;
+      line-height: 1.2; margin-bottom: 16px; letter-spacing: -0.5px;
+    }
+    .splash-silhouettes {
+      display: flex; gap: 12px; align-items: flex-end; justify-content: center;
+      margin-bottom: 4px;
+    }
+    .silhouette-card {
+      background: rgba(255,255,255,0.12); border-radius: 12px;
+      padding: 8px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    }
+    .silhouette-date { font-size: 10px; color: rgba(255,255,255,0.6); }
+    .silhouette-svg { width: 44px; height: 72px; }
+
+    .splash-tagline {
+      font-size: 18px; color: #164e63; font-weight: 700; text-align: center; margin-bottom: 8px;
+    }
+    .splash-sub {
+      font-size: 14px; color: #0e7490; text-align: center; margin-bottom: 32px; line-height: 1.5;
+    }
+
+    .splash-btn-primary {
+      width: 100%; padding: 16px; border-radius: 50px;
+      background: linear-gradient(90deg, #0891b2, #0e9488);
+      border: none; color: #fff; font-size: 16px; font-weight: 800;
+      letter-spacing: 1.5px; cursor: pointer;
+      box-shadow: 0 6px 24px rgba(8,145,178,0.4);
+      margin-bottom: 12px;
+    }
+    .splash-btn-secondary {
+      width: 100%; padding: 15px; border-radius: 50px;
+      background: transparent; border: 2px solid #0891b2;
+      color: #0891b2; font-size: 16px; font-weight: 800;
+      letter-spacing: 1.5px; cursor: pointer;
+    }
+
+    /* ── ABOUT SECTION ── */
+    .about-card {
+      background: linear-gradient(135deg, #0c1a2e 0%, #0f2744 100%);
+      border-radius: var(--radius); border: 1px solid rgba(8,145,178,0.3);
+      overflow: hidden; margin-bottom: 0;
+    }
+    .about-hero-band {
+      background: linear-gradient(90deg, #0891b2, #0e9488);
+      padding: 18px 20px; display: flex; align-items: center; gap: 14px;
+    }
+    .about-logo-small { width: 44px; height: 44px; flex-shrink: 0; }
+    .about-brand-text .about-brand-name { font-size: 20px; font-weight: 900; color: #fff; letter-spacing: 2px; }
+    .about-brand-text .about-brand-sub { font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 2px; }
+    .about-body { padding: 20px; }
+    .about-features { display: flex; flex-direction: column; gap: 14px; }
+    .about-feature {
+      display: flex; align-items: flex-start; gap: 12px;
+      background: rgba(255,255,255,0.04); border-radius: 12px; padding: 14px;
+      border: 1px solid rgba(8,145,178,0.15);
+    }
+    .about-feature-icon { font-size: 26px; flex-shrink: 0; margin-top: 2px; }
+    .about-feature-text .af-title { font-size: 14px; font-weight: 700; color: #7dd3fc; margin-bottom: 3px; }
+    .about-feature-text .af-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
 
     /* HEADER */
     .header { background: linear-gradient(135deg, #1a0a3e 0%, #0e0e1a 60%); padding: 28px 20px 20px; position: relative; overflow: hidden; }
@@ -239,6 +328,60 @@
   </style>
 </head>
 <body>
+<!-- Native HTML splash — visible immediately before React loads -->
+<div id="native-splash" style="
+  position:fixed;inset:0;z-index:99999;
+  background:linear-gradient(160deg,#e0faf6 0%,#b2ecec 30%,#5bc8c8 60%,#0891b2 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:32px 28px;
+  transition:opacity 0.5s ease;
+">
+  <svg width="80" height="80" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:14px">
+    <defs><linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00C9B1"/><stop offset="100%" stop-color="#0369A1"/></linearGradient></defs>
+    <path d="M5 50 Q30 10 50 10 Q70 10 95 50 Q70 90 50 90 Q30 90 5 50Z" fill="none" stroke="url(#sg)" stroke-width="7"/>
+    <circle cx="50" cy="50" r="22" fill="url(#sg)"/>
+    <g fill="white" opacity="0.92">
+      <circle cx="50" cy="36" r="5"/>
+      <path d="M44 42 Q42 52 44 60 L48 58 L48 52 L52 52 L52 58 L56 60 Q58 52 56 42 Q53 44 50 44 Q47 44 44 42Z"/>
+      <path d="M44 44 Q38 46 37 50 Q39 52 42 50 Q43 47 44 46Z"/>
+      <path d="M56 44 Q62 46 63 50 Q61 52 58 50 Q57 47 56 46Z"/>
+      <path d="M46 60 L44 72 L48 72 L50 64 L52 72 L56 72 L54 60Z"/>
+    </g>
+  </svg>
+  <div style="font-size:36px;font-weight:900;letter-spacing:3px;color:#0c4a6e;margin-bottom:24px;font-family:-apple-system,sans-serif">EYEBODY</div>
+  <div style="width:100%;border-radius:20px;background:linear-gradient(135deg,#0c4a6e,#0369a1 40%,#0e7490);padding:24px 20px 20px;margin-bottom:28px">
+    <div style="font-size:28px;font-weight:900;color:#fff;line-height:1.2;margin-bottom:20px;font-family:-apple-system,sans-serif;letter-spacing:-0.5px">TRACK YOUR<br>PROGRESS.<br>VISUALLY.</div>
+    <div style="display:flex;gap:12px;justify-content:center">
+      <div style="background:rgba(255,255,255,0.12);border-radius:12px;padding:8px;display:flex;flex-direction:column;align-items:center;gap:4px">
+        <svg width="44" height="72" viewBox="0 0 44 72">
+          <g fill="rgba(255,255,255,0.5)"><circle cx="22" cy="8" r="7"/><path d="M14 16 Q10 26 12 40 L18 38 L18 28 L26 28 L26 38 L32 40 Q34 26 30 16 Q26 20 22 20 Q18 20 14 16Z"/><path d="M14 16 Q7 19 6 26 Q8 29 13 27 Q14 22 14 19Z"/><path d="M30 16 Q37 19 38 26 Q36 29 31 27 Q30 22 30 19Z"/><path d="M16 40 L13 62 L19 62 L22 50 L25 62 L31 62 L28 40Z"/></g>
+        </svg>
+        <span style="font-size:10px;color:rgba(255,255,255,0.6);font-family:-apple-system,sans-serif">Mar 2022</span>
+      </div>
+      <div style="background:rgba(255,255,255,0.12);border-radius:12px;padding:8px;display:flex;flex-direction:column;align-items:center;gap:4px">
+        <svg width="44" height="72" viewBox="0 0 44 72">
+          <g fill="rgba(255,255,255,0.9)"><circle cx="22" cy="8" r="6.5"/><path d="M16 16 Q13 24 14 38 L19 36 L19 27 L25 27 L25 36 L30 38 Q31 24 28 16 Q25 19 22 19 Q19 19 16 16Z"/><path d="M16 16 Q9 18 8 24 Q10 27 14 25 Q15 21 15 18Z"/><path d="M28 16 Q35 18 36 24 Q34 27 30 25 Q29 21 29 18Z"/><path d="M17 38 L15 62 L20 62 L22 51 L24 62 L29 62 L27 38Z"/></g>
+        </svg>
+        <span style="font-size:10px;color:rgba(255,255,255,0.6);font-family:-apple-system,sans-serif">May 2023</span>
+      </div>
+    </div>
+  </div>
+  <div style="font-size:18px;color:#164e63;font-weight:700;text-align:center;margin-bottom:8px;font-family:-apple-system,sans-serif">EYEBODY</div>
+  <div style="font-size:14px;color:#0e7490;text-align:center;margin-bottom:32px;line-height:1.5;font-family:-apple-system,sans-serif">Transform your journey with<br>visual feedback.</div>
+  <button onclick="hideSplash()" style="width:100%;padding:16px;border-radius:50px;background:linear-gradient(90deg,#0891b2,#0e9488);border:none;color:#fff;font-size:16px;font-weight:800;letter-spacing:1.5px;cursor:pointer;box-shadow:0 6px 24px rgba(8,145,178,0.4);margin-bottom:12px;font-family:-apple-system,sans-serif">GET STARTED</button>
+  <button onclick="hideSplash()" style="width:100%;padding:15px;border-radius:50px;background:transparent;border:2px solid #0891b2;color:#0891b2;font-size:16px;font-weight:800;letter-spacing:1.5px;cursor:pointer;font-family:-apple-system,sans-serif">LOG IN</button>
+</div>
+<script>
+  var _splashTimer = setTimeout(hideSplash, 2500);
+  function hideSplash() {
+    clearTimeout(_splashTimer);
+    var el = document.getElementById('native-splash');
+    if (!el) return;
+    el.style.opacity = '0';
+    setTimeout(function(){ el.remove(); }, 500);
+  }
+</script>
+
 <div id="root"></div>
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
@@ -638,6 +781,123 @@ function DecorateModal({ beforePhotos, afterPhotos, beforeDate, afterDate, onClo
   );
 }
 
+// ── EyeLogo SVG ────────────────────────────────────────────
+function EyeLogo({ size = 80 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="eyeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#00C9B1" />
+          <stop offset="100%" stopColor="#0369A1" />
+        </linearGradient>
+      </defs>
+      {/* outer eye shape */}
+      <path d="M5 50 Q30 10 50 10 Q70 10 95 50 Q70 90 50 90 Q30 90 5 50Z" fill="none" stroke="url(#eyeGrad)" strokeWidth="7" />
+      {/* iris */}
+      <circle cx="50" cy="50" r="22" fill="url(#eyeGrad)" />
+      {/* figure silhouette inside */}
+      <g fill="white" opacity="0.92">
+        {/* head */}
+        <circle cx="50" cy="36" r="5" />
+        {/* torso */}
+        <path d="M44 42 Q42 52 44 60 L48 58 L48 52 L52 52 L52 58 L56 60 Q58 52 56 42 Q53 44 50 44 Q47 44 44 42Z" />
+        {/* arms flex */}
+        <path d="M44 44 Q38 46 37 50 Q39 52 42 50 Q43 47 44 46Z" />
+        <path d="M56 44 Q62 46 63 50 Q61 52 58 50 Q57 47 56 46Z" />
+        {/* legs */}
+        <path d="M46 60 L44 72 L48 72 L50 64 L52 72 L56 72 L54 60Z" />
+      </g>
+    </svg>
+  );
+}
+
+// ── SplashScreen ────────────────────────────────────────────
+function SplashScreen({ onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 2500);
+    return () => clearTimeout(t);
+  }, [onDone]);
+
+  return (
+    <div className="splash" onClick={onDone}>
+      <EyeLogo size={80} />
+      <div className="splash-brand">EYEBODY</div>
+
+      <div className="splash-hero">
+        <div className="splash-hero-headline">TRACK YOUR<br />PROGRESS.<br />VISUALLY.</div>
+        <div className="splash-silhouettes">
+          <div className="silhouette-card">
+            <svg className="silhouette-svg" viewBox="0 0 44 72" xmlns="http://www.w3.org/2000/svg">
+              <g fill="rgba(255,255,255,0.5)">
+                <circle cx="22" cy="8" r="7" />
+                <path d="M14 16 Q10 26 12 40 L18 38 L18 28 L26 28 L26 38 L32 40 Q34 26 30 16 Q26 20 22 20 Q18 20 14 16Z" />
+                <path d="M14 16 Q7 19 6 26 Q8 29 13 27 Q14 22 14 19Z" />
+                <path d="M30 16 Q37 19 38 26 Q36 29 31 27 Q30 22 30 19Z" />
+                <path d="M16 40 L13 62 L19 62 L22 50 L25 62 L31 62 L28 40Z" />
+              </g>
+            </svg>
+            <div className="silhouette-date">Mar 2022</div>
+          </div>
+          <div className="silhouette-card">
+            <svg className="silhouette-svg" viewBox="0 0 44 72" xmlns="http://www.w3.org/2000/svg">
+              <g fill="rgba(255,255,255,0.9)">
+                <circle cx="22" cy="8" r="6.5" />
+                <path d="M16 16 Q13 24 14 38 L19 36 L19 27 L25 27 L25 36 L30 38 Q31 24 28 16 Q25 19 22 19 Q19 19 16 16Z" />
+                <path d="M16 16 Q9 18 8 24 Q10 27 14 25 Q15 21 15 18Z" />
+                <path d="M28 16 Q35 18 36 24 Q34 27 30 25 Q29 21 29 18Z" />
+                <path d="M17 38 L15 62 L20 62 L22 51 L24 62 L29 62 L27 38Z" />
+              </g>
+            </svg>
+            <div className="silhouette-date">May 2023</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="splash-tagline">EYEBODY</div>
+      <div className="splash-sub">Transform your journey with<br />visual feedback.</div>
+
+      <button className="splash-btn-primary">GET STARTED</button>
+      <button className="splash-btn-secondary">LOG IN</button>
+    </div>
+  );
+}
+
+// ── AboutSection ────────────────────────────────────────────
+function AboutSection() {
+  const features = [
+    { icon: '📸', title: '매일 눈바디 기록', desc: '정면·측면 사진을 매일 업로드하고 사진첩과 연동해 손쉽게 기록하세요.' },
+    { icon: '📅', title: '캘린더로 한눈에', desc: '기록된 날짜에 점으로 표시되며, 날짜를 눌러 그날의 사진을 바로 확인할 수 있어요.' },
+    { icon: '💪', title: 'Before & After 비교', desc: '처음 사진과 현재 사진을 2×2 그리드로 나란히 비교해 변화를 실감하세요.' },
+    { icon: '✨', title: '꾸미기 & 공유', desc: '문구·스티커·사진을 드래그로 배치하고, 필터를 입혀 사진첩에 저장하거나 친구에게 공유하세요.' },
+    { icon: '🎯', title: '목표일 D-Day', desc: '목표일을 설정하면 카운트다운이 시작됩니다. 긴장감을 유지하며 동기를 지켜보세요.' },
+  ];
+
+  return (
+    <div className="about-card">
+      <div className="about-hero-band">
+        <EyeLogo size={44} />
+        <div className="about-brand-text">
+          <div className="about-brand-name">EYEBODY</div>
+          <div className="about-brand-sub">Transform your journey with visual feedback.</div>
+        </div>
+      </div>
+      <div className="about-body">
+        <div className="about-features">
+          {features.map((f, i) => (
+            <div key={i} className="about-feature">
+              <div className="about-feature-icon">{f.icon}</div>
+              <div className="about-feature-text">
+                <div className="af-title">{f.title}</div>
+                <div className="af-desc">{f.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── GoalModal ──────────────────────────────────────────────
 function GoalModal({ current, onSave, onClose }) {
   const [val, setVal] = useState(current || today);
@@ -655,6 +915,7 @@ function GoalModal({ current, onSave, onClose }) {
 
 // ── App ────────────────────────────────────────────────────
 function App() {
+  const [showSplash, setShowSplash]   = useState(true);
   const [data, setData]           = useState(load);
   const [calYear, setCalYear]     = useState(() => new Date().getFullYear());
   const [calMonth, setCalMonth]   = useState(() => new Date().getMonth());
@@ -734,6 +995,9 @@ function App() {
 
   return (
     <div>
+      {/* SPLASH */}
+      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+
       {/* HEADER */}
       <div className="header">
         <div className="header-row">
@@ -910,6 +1174,12 @@ function App() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ABOUT */}
+      <div className="section">
+        <div className="section-title">ℹ️ EYEBODY 소개</div>
+        <AboutSection />
       </div>
 
       <div style={{ height: 24 }} />

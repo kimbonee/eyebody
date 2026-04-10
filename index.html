@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>눈바디 — 내 몸 변화 기록</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0e0e1a;
+      --surface: #16162a;
+      --card: #1e1e35;
+      --card2: #252540;
+      --border: #2e2e50;
+      --purple: #7c5cfc;
+      --purple-light: #9b7dff;
+      --purple-glow: rgba(124,92,252,0.25);
+      --pink: #fc5ca0;
+      --gold: #ffd700;
+      --text: #f0f0ff;
+      --text-dim: #8888aa;
+      --text-muted: #555570;
+      --radius: 16px;
+      --radius-sm: 10px;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    #root { max-width: 480px; margin: 0 auto; padding-bottom: 60px; }
+
+    /* ── HEADER ── */
+    .header {
+      background: linear-gradient(135deg, #1a0a3e 0%, #0e0e1a 60%);
+      padding: 28px 20px 20px;
+      position: relative; overflow: hidden;
+    }
+    .header::before {
+      content: '';
+      position: absolute; top: -60px; right: -60px;
+      width: 200px; height: 200px;
+      background: radial-gradient(circle, var(--purple-glow) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .header-row { display: flex; align-items: center; justify-content: space-between; }
+    .app-brand { display: flex; align-items: center; gap: 10px; }
+    .app-logo {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--purple), var(--pink));
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .app-title { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+    .app-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+
+    .countdown-badge {
+      background: linear-gradient(135deg, var(--purple), var(--pink));
+      padding: 8px 16px; border-radius: 20px;
+      font-size: 18px; font-weight: 800; letter-spacing: -0.5px;
+      box-shadow: 0 4px 20px var(--purple-glow);
+      cursor: pointer; user-select: none;
+    }
+    .countdown-badge.urgent {
+      background: linear-gradient(135deg, #ff4444, var(--pink));
+      animation: pulse 1.5s infinite;
+    }
+    .countdown-badge.achieved { background: linear-gradient(135deg, #22c55e, #16a34a); }
+    @keyframes pulse { 0%,100%{box-shadow:0 4px 20px rgba(255,68,68,0.3)} 50%{box-shadow:0 4px 30px rgba(255,68,68,0.6)} }
+
+    /* ── GOAL BAR ── */
+    .goal-bar {
+      background: var(--surface); margin: 12px 16px 0;
+      border-radius: var(--radius-sm); border: 1px solid var(--border);
+      padding: 14px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .goal-bar-left { display: flex; align-items: center; gap: 8px; }
+    .goal-emoji { font-size: 20px; }
+    .goal-info .goal-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+    .goal-info .goal-date-val { font-size: 15px; font-weight: 700; color: var(--text); margin-top: 2px; }
+    .btn-set-goal {
+      background: linear-gradient(135deg, var(--purple), var(--purple-light));
+      border: none; border-radius: 20px; padding: 8px 20px;
+      color: #fff; font-size: 14px; font-weight: 600;
+      cursor: pointer; box-shadow: 0 4px 14px var(--purple-glow); transition: opacity 0.2s;
+    }
+    .btn-set-goal:hover { opacity: 0.85; }
+    .btn-change {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; padding: 5px 12px;
+      color: var(--text-dim); font-size: 12px; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-change:hover { color: var(--text); border-color: var(--purple); }
+
+    /* ── SECTION ── */
+    .section { margin: 12px 16px; }
+    .section-title {
+      font-size: 16px; font-weight: 700;
+      display: flex; align-items: center; gap: 6px; margin-bottom: 12px;
+    }
+    .section-title .badge {
+      font-size: 11px; font-weight: 600;
+      background: var(--purple-glow); color: var(--purple-light);
+      border: 1px solid rgba(124,92,252,0.3); padding: 2px 8px; border-radius: 20px;
+    }
+
+    /* ── UPLOAD ── */
+    .upload-card-wrapper {
+      background: var(--surface); border-radius: var(--radius);
+      border: 1px solid var(--border); padding: 16px;
+    }
+    .upload-date-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .upload-date-label { font-size: 13px; color: var(--text-dim); }
+    .upload-date-val { font-size: 13px; font-weight: 600; color: var(--purple-light); }
+    .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .upload-zone {
+      aspect-ratio: 3/4; border-radius: var(--radius-sm);
+      border: 2px dashed var(--border); cursor: pointer;
+      position: relative; overflow: hidden; transition: all 0.2s; background: var(--card);
+    }
+    .upload-zone:hover { border-color: var(--purple); background: var(--card2); }
+    .upload-zone.has-photo { border-style: solid; border-color: var(--purple); }
+    .upload-placeholder {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    }
+    .upload-plus {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, var(--purple), var(--purple-light));
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 24px; color: #fff; font-weight: 300; box-shadow: 0 4px 14px var(--purple-glow);
+    }
+    .upload-type-label { font-size: 13px; font-weight: 600; color: var(--text-dim); }
+    .upload-hint { font-size: 11px; color: var(--text-muted); }
+    .preview-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .photo-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 50%);
+      display: flex; align-items: flex-end; padding: 8px;
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .upload-zone:hover .photo-overlay { opacity: 1; }
+    .re-upload-label { font-size: 11px; color: #fff; font-weight: 600; }
+
+    /* ── CALENDAR ── */
+    .calendar-card {
+      background: var(--surface); border-radius: var(--radius);
+      border: 1px solid var(--border); overflow: hidden;
+    }
+    .cal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 12px; }
+    .cal-title { font-size: 17px; font-weight: 700; }
+    .cal-nav {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; color: var(--text); cursor: pointer; transition: all 0.2s;
+    }
+    .cal-nav:hover { background: var(--purple); border-color: var(--purple); }
+    .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); padding: 0 8px; }
+    .cal-weekday { text-align: center; font-size: 11px; font-weight: 600; color: var(--text-muted); padding: 6px 0; }
+    .cal-weekday:first-child { color: #ff6b6b; }
+    .cal-weekday:last-child { color: #6b9fff; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); padding: 0 8px 8px; gap: 2px; }
+    .cal-day {
+      aspect-ratio: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      border-radius: 8px; cursor: pointer; position: relative;
+      transition: all 0.15s; font-size: 13px;
+    }
+    .cal-day:not(.empty):hover { background: var(--card2); }
+    .cal-day.empty { cursor: default; }
+    .cal-day.is-today .day-num { color: var(--purple-light); font-weight: 700; }
+    .cal-day.is-selected { background: var(--purple-glow); border: 1px solid rgba(124,92,252,0.4); }
+    .cal-day.is-goal .day-num { color: var(--gold) !important; font-weight: 800; }
+    /* select-mode: dates with photos are highlighted */
+    .cal-day.selectable { background: rgba(124,92,252,0.12); cursor: pointer; }
+    .cal-day.selectable:hover { background: rgba(124,92,252,0.28); }
+    .cal-day.is-before-pick { background: rgba(255,80,80,0.2); border: 1px solid rgba(255,80,80,0.4); }
+    .cal-day.is-after-pick { background: rgba(124,92,252,0.2); border: 1px solid rgba(124,92,252,0.4); }
+    .cal-day:nth-child(7n+1) .day-num { color: #ff6b6b; }
+    .cal-day:nth-child(7n) .day-num { color: #6b9fff; }
+
+    .day-num { font-size: 13px; line-height: 1; }
+    .day-dot-row { display: flex; gap: 2px; margin-top: 3px; height: 6px; align-items: center; }
+    .day-dot { width: 5px; height: 5px; border-radius: 50%; }
+    .goal-flag { font-size: 10px; line-height: 1; margin-top: 2px; }
+
+    /* selecting mode banner */
+    .select-mode-banner {
+      background: linear-gradient(90deg, rgba(124,92,252,0.2), rgba(252,92,160,0.1));
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 13px;
+    }
+    .select-mode-text { display: flex; align-items: center; gap: 6px; }
+    .select-mode-badge {
+      font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px;
+    }
+    .select-mode-badge.before { background: rgba(255,80,80,0.25); color: #ff8080; }
+    .select-mode-badge.after { background: rgba(124,92,252,0.25); color: var(--purple-light); }
+    .btn-cancel-select {
+      background: none; border: 1px solid var(--border); border-radius: 8px;
+      padding: 4px 10px; color: var(--text-dim); font-size: 12px; cursor: pointer;
+    }
+    .btn-cancel-select:hover { color: var(--text); }
+
+    /* Selected date panel */
+    .selected-panel { border-top: 1px solid var(--border); padding: 16px; animation: slideDown 0.2s ease; }
+    @keyframes slideDown { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+    .selected-panel-title { font-size: 13px; color: var(--text-dim); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    .selected-panel-title strong { color: var(--text); }
+    .selected-photos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .selected-photo { aspect-ratio: 3/4; border-radius: var(--radius-sm); object-fit: cover; width: 100%; }
+    .selected-no-photo {
+      aspect-ratio: 3/4; border-radius: var(--radius-sm);
+      background: var(--card); border: 1px dashed var(--border);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-muted); font-size: 12px;
+    }
+
+    /* ── COMPARISON ── */
+    .comparison-card {
+      background: var(--surface); border-radius: var(--radius);
+      border: 1px solid var(--border); overflow: hidden;
+    }
+    .comparison-header-row { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--border); }
+    .comp-col-label {
+      padding: 10px 12px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .comp-col-label.before { background: rgba(255,100,100,0.08); border-right: 1px solid var(--border); }
+    .comp-col-label.after { background: rgba(124,92,252,0.08); }
+    .comp-col-info { display: flex; flex-direction: column; gap: 2px; }
+    .comp-col-title { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; }
+    .comp-col-label.before .comp-col-title { color: #ff6b6b; }
+    .comp-col-label.after .comp-col-title { color: var(--purple-light); }
+    .comp-col-date { font-size: 10px; color: var(--text-dim); }
+    .btn-pick-date {
+      background: rgba(255,255,255,0.08); border: 1px solid var(--border);
+      border-radius: 6px; padding: 4px 8px; font-size: 11px; color: var(--text-dim);
+      cursor: pointer; transition: all 0.2s; white-space: nowrap;
+    }
+    .btn-pick-date:hover { color: var(--text); border-color: var(--purple); }
+    .btn-pick-date.active-before { background: rgba(255,80,80,0.2); border-color: #ff6b6b; color: #ff8080; }
+    .btn-pick-date.active-after { background: rgba(124,92,252,0.2); border-color: var(--purple); color: var(--purple-light); }
+
+    .comparison-grid { display: grid; grid-template-columns: 1fr 1fr; }
+    .comp-cell {
+      position: relative;
+      border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    }
+    .comp-cell:nth-child(2n) { border-right: none; }
+    .comp-cell:nth-last-child(-n+2) { border-bottom: none; }
+    .comp-cell img { width: 100%; aspect-ratio: 3/4; object-fit: cover; display: block; }
+    .comp-cell-empty {
+      aspect-ratio: 3/4; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 6px;
+      background: var(--card); color: var(--text-muted); font-size: 12px; text-align: center; padding: 8px;
+    }
+    .comp-row-label {
+      position: absolute; bottom: 8px; left: 8px;
+      background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
+      border-radius: 6px; padding: 2px 8px; font-size: 11px; color: #fff; font-weight: 600;
+    }
+    .comparison-actions {
+      padding: 14px 16px; border-top: 1px solid var(--border);
+    }
+    .btn-primary {
+      width: 100%;
+      background: linear-gradient(135deg, var(--purple), var(--purple-light));
+      border: none; border-radius: var(--radius-sm); padding: 13px 16px;
+      color: #fff; font-size: 15px; font-weight: 700;
+      cursor: pointer; box-shadow: 0 4px 18px var(--purple-glow);
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-primary:active { transform: scale(0.98); }
+    .empty-comparison { padding: 48px 24px; text-align: center; }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-text { color: var(--text-dim); font-size: 14px; line-height: 1.6; }
+    .empty-hint { color: var(--text-muted); font-size: 12px; margin-top: 6px; }
+
+    /* ── MODALS ── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+      display: flex; align-items: flex-end; justify-content: center;
+      animation: fadeIn 0.2s ease;
+    }
+    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+    .modal {
+      background: var(--surface); border-radius: 24px 24px 0 0;
+      border: 1px solid var(--border); border-bottom: none;
+      width: 100%; max-width: 480px; padding: 24px 20px 36px;
+      animation: slideUp 0.25s ease;
+    }
+    @keyframes slideUp { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }
+    .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 20px; }
+    .modal-title { font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 24px; }
+    .date-picker-input {
+      width: 100%; padding: 14px 16px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text);
+      font-size: 16px; margin-bottom: 16px; outline: none; transition: border-color 0.2s;
+    }
+    .date-picker-input:focus { border-color: var(--purple); }
+
+    /* ── DECORATE MODAL ── */
+    .decorate-modal { border-radius: 24px 24px 0 0; max-height: 90vh; overflow-y: auto; }
+    .decor-canvas-wrap {
+      width: 100%; aspect-ratio: 1; background: #000;
+      border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 20px;
+    }
+    .decor-canvas { width: 100%; height: 100%; display: block; }
+    .control-group { margin-bottom: 16px; }
+    .control-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; display: block; }
+    .text-input {
+      width: 100%; padding: 11px 14px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text); font-size: 14px;
+      outline: none; transition: border-color 0.2s;
+    }
+    .text-input:focus { border-color: var(--purple); }
+    .text-input::placeholder { color: var(--text-muted); }
+    .filter-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .filter-btn {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 7px 16px;
+      color: var(--text-dim); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+    }
+    .filter-btn.active { background: var(--purple); border-color: var(--purple); color: #fff; }
+    .sticker-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .sticker-btn {
+      width: 42px; height: 42px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; font-size: 22px; cursor: pointer; transition: all 0.15s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .sticker-btn.active { background: var(--purple-glow); border-color: var(--purple); transform: scale(1.1); }
+    .btn-save-photo {
+      width: 100%; background: linear-gradient(135deg, #22c55e, #16a34a);
+      border: none; border-radius: var(--radius-sm); padding: 14px; color: #fff;
+      font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 4px; transition: opacity 0.2s;
+    }
+    .btn-save-photo:hover { opacity: 0.9; }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+// ── Storage ───────────────────────────────────────────────
+const KEY = 'nunbody_v1';
+const load = () => {
+  try { return JSON.parse(localStorage.getItem(KEY)) || { goalDate: null, photos: {} }; }
+  catch { return { goalDate: null, photos: {} }; }
+};
+const save = (d) => {
+  try { localStorage.setItem(KEY, JSON.stringify(d)); }
+  catch (e) { console.warn('저장 실패 (용량 초과)', e); }
+};
+
+// ── Helpers ───────────────────────────────────────────────
+const toDateStr = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+const today = toDateStr(new Date());
+
+const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
+const firstDayOf = (y, m) => new Date(y, m, 1).getDay();
+const WEEKDAYS = ['일','월','화','수','목','금','토'];
+
+const fmt = (str) => {
+  if (!str) return '';
+  const [y, m, d] = str.split('-');
+  return `${y}년 ${parseInt(m)}월 ${parseInt(d)}일`;
+};
+
+// ── Image compression ─────────────────────────────────────
+// Resize + JPEG compress before storing to avoid localStorage quota errors
+const compressImage = (file) => new Promise((resolve) => {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 900;
+      let { width: w, height: h } = img;
+      if (w > h ? w > MAX : h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.78));
+    };
+    img.onerror = () => resolve(e.target.result); // fallback
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+// ── DecorateModal ─────────────────────────────────────────
+const STICKERS = ['💪','🔥','⭐','🏆','✨','💯','🎯','🌟','😤','🥇'];
+const FILTERS = [
+  { id: 'none', label: '원본' }, { id: 'grayscale', label: '흑백' },
+  { id: 'warm', label: '따뜻' }, { id: 'cool', label: '쿨' }, { id: 'vivid', label: '선명' },
+];
+const FILTER_CSS = {
+  none: '', grayscale: 'grayscale(100%)',
+  warm: 'sepia(40%) saturate(140%) brightness(1.05)',
+  cool: 'hue-rotate(30deg) saturate(80%) brightness(0.95)',
+  vivid: 'saturate(160%) contrast(110%)',
+};
+
+function DecorateModal({ beforePhotos, afterPhotos, beforeDate, afterDate, onClose }) {
+  const canvasRef = useRef(null);
+  const [customText, setCustomText] = useState('');
+  const [filter, setFilter] = useState('none');
+  const [activeSticker, setActiveSticker] = useState('');
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const hw = W / 2, hh = H / 2;
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#111'; ctx.fillRect(0, 0, W, H);
+
+    const slots = [
+      { src: beforePhotos?.front, x: 0,  y: 0,  w: hw, h: hh, label: '처음 정면' },
+      { src: afterPhotos?.front,  x: hw, y: 0,  w: hw, h: hh, label: '현재 정면' },
+      { src: beforePhotos?.side,  x: 0,  y: hh, w: hw, h: hh, label: '처음 측면' },
+      { src: afterPhotos?.side,   x: hw, y: hh, w: hw, h: hh, label: '현재 측면' },
+    ];
+
+    const loadImg = (src) => new Promise((res) => {
+      if (!src) return res(null);
+      const img = new Image();
+      img.onload = () => res(img); img.onerror = () => res(null); img.src = src;
+    });
+
+    Promise.all(slots.map(s => loadImg(s.src))).then(imgs => {
+      imgs.forEach((img, i) => {
+        const { x, y, w, h, label } = slots[i];
+        ctx.save();
+        ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+        if (img) {
+          ctx.filter = FILTER_CSS[filter] || '';
+          const ir = img.width / img.height, br = w / h;
+          let dw, dh, dx, dy;
+          if (ir > br) { dh = h; dw = dh * ir; dx = x + (w - dw) / 2; dy = y; }
+          else { dw = w; dh = dw / ir; dx = x; dy = y + (h - dh) / 2; }
+          ctx.drawImage(img, dx, dy, dw, dh);
+          ctx.filter = 'none';
+        } else {
+          ctx.fillStyle = '#222'; ctx.fillRect(x, y, w, h);
+          ctx.fillStyle = '#555'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText('사진 없음', x + w / 2, y + h / 2); ctx.textAlign = 'left';
+        }
+        const grad = ctx.createLinearGradient(x, y + h * 0.6, x, y + h);
+        grad.addColorStop(0, 'transparent'); grad.addColorStop(1, 'rgba(0,0,0,0.55)');
+        ctx.fillStyle = grad; ctx.fillRect(x, y, w, h);
+        ctx.restore();
+        ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = 'bold 12px sans-serif';
+        ctx.fillText(label, x + 8, y + h - 10);
+      });
+
+      // grid lines
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(hw, 0); ctx.lineTo(hw, H); ctx.moveTo(0, hh); ctx.lineTo(W, hh); ctx.stroke();
+
+      // header bands
+      const bh = 28;
+      ctx.fillStyle = 'rgba(255,80,80,0.75)'; ctx.fillRect(0, 0, hw, bh);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(`BEFORE  ${beforeDate || ''}`, hw / 2, bh - 8);
+      ctx.fillStyle = 'rgba(124,92,252,0.75)'; ctx.fillRect(hw, 0, hw, bh);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(`AFTER  ${afterDate || ''}`, hw + hw / 2, bh - 8);
+      ctx.textAlign = 'left';
+
+      if (customText.trim()) {
+        ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
+        ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 6;
+        ctx.fillStyle = '#FFD700'; ctx.fillText(customText.trim(), W / 2, H - 18);
+        ctx.shadowBlur = 0; ctx.textAlign = 'left';
+      }
+      if (activeSticker) {
+        ctx.font = `${Math.floor(W * 0.13)}px sans-serif`;
+        ctx.fillText(activeSticker, W - Math.floor(W * 0.18), Math.floor(W * 0.18));
+      }
+    });
+  }, [beforePhotos, afterPhotos, beforeDate, afterDate, filter, customText, activeSticker]);
+
+  useEffect(() => { draw(); }, [draw]);
+
+  const handleSave = () => {
+    const canvas = canvasRef.current;
+    const link = document.createElement('a');
+    link.download = `눈바디_비교_${today}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal decorate-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-handle" />
+        <div className="modal-title">✨ 꾸미기 & 저장</div>
+        <div className="decor-canvas-wrap">
+          <canvas ref={canvasRef} width={600} height={600} className="decor-canvas" />
+        </div>
+        <div className="control-group">
+          <span className="control-label">문구 추가</span>
+          <input className="text-input" type="text" placeholder="나만의 다짐 문구를 입력하세요"
+            value={customText} onChange={e => setCustomText(e.target.value)} />
+        </div>
+        <div className="control-group">
+          <span className="control-label">필터</span>
+          <div className="filter-row">
+            {FILTERS.map(f => (
+              <button key={f.id} className={`filter-btn ${filter === f.id ? 'active' : ''}`}
+                onClick={() => setFilter(f.id)}>{f.label}</button>
+            ))}
+          </div>
+        </div>
+        <div className="control-group">
+          <span className="control-label">스티커</span>
+          <div className="sticker-row">
+            {STICKERS.map(s => (
+              <button key={s} className={`sticker-btn ${activeSticker === s ? 'active' : ''}`}
+                onClick={() => setActiveSticker(activeSticker === s ? '' : s)}>{s}</button>
+            ))}
+          </div>
+        </div>
+        <button className="btn-save-photo" onClick={handleSave}>📥 사진으로 저장하기</button>
+      </div>
+    </div>
+  );
+}
+
+// ── GoalModal ─────────────────────────────────────────────
+function GoalModal({ current, onSave, onClose }) {
+  // [수정 1] 기본값을 오늘 날짜로
+  const [val, setVal] = useState(current || today);
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-handle" />
+        <div className="modal-title">🎯 목표일 설정</div>
+        <input className="date-picker-input" type="date" value={val}
+          onChange={e => setVal(e.target.value)} />
+        <button className="btn-primary"
+          onClick={() => { if (val) { onSave(val); onClose(); } }}>확인</button>
+      </div>
+    </div>
+  );
+}
+
+// ── App ───────────────────────────────────────────────────
+function App() {
+  const [data, setData] = useState(load);
+  const [calYear, setCalYear] = useState(() => new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [showDecorate, setShowDecorate] = useState(false);
+
+  // [수정 4] Before/After 날짜 직접 선택
+  const [beforeDate, setBeforeDate] = useState(null);
+  const [afterDate, setAfterDate] = useState(null);
+  // selectingFor: null | 'before' | 'after'
+  const [selectingFor, setSelectingFor] = useState(null);
+
+  const frontRef = useRef(null);
+  const sideRef = useRef(null);
+
+  useEffect(() => { save(data); }, [data]);
+
+  // [수정 3] 사진이 바뀔 때마다 before/after 기본값 자동 세팅
+  const photoDatesSorted = useMemo(() => Object.keys(data.photos).sort(), [data.photos]);
+
+  useEffect(() => {
+    if (photoDatesSorted.length === 0) {
+      setBeforeDate(null); setAfterDate(null); return;
+    }
+    const first = photoDatesSorted[0];
+    const last = photoDatesSorted[photoDatesSorted.length - 1];
+    setBeforeDate(prev => prev && data.photos[prev] ? prev : first);
+    setAfterDate(prev => prev && data.photos[prev] ? prev : last);
+  }, [photoDatesSorted]);
+
+  // Countdown
+  const countdown = useMemo(() => {
+    if (!data.goalDate) return null;
+    const goal = new Date(data.goalDate + 'T00:00:00');
+    const now = new Date(today + 'T00:00:00');
+    return Math.round((goal - now) / 86400000);
+  }, [data.goalDate]);
+
+  // [수정 2] 이미지 압축 후 저장 (측면 업로드 검은 화면 방지)
+  const handleUpload = async (type, file) => {
+    if (!file) return;
+    const compressed = await compressImage(file);
+    setData(prev => {
+      const photos = { ...prev.photos };
+      photos[today] = { ...(photos[today] || {}), [type]: compressed };
+      return { ...prev, photos };
+    });
+  };
+
+  // Calendar navigation
+  const prevMonth = () => {
+    if (calMonth === 0) { setCalYear(y => y - 1); setCalMonth(11); }
+    else setCalMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (calMonth === 11) { setCalYear(y => y + 1); setCalMonth(0); }
+    else setCalMonth(m => m + 1);
+  };
+
+  const calDays = useMemo(() => {
+    const total = daysInMonth(calYear, calMonth);
+    const first = firstDayOf(calYear, calMonth);
+    const cells = [];
+    for (let i = 0; i < first; i++) cells.push(null);
+    for (let d = 1; d <= total; d++) {
+      const str = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      cells.push({ d, str });
+    }
+    return cells;
+  }, [calYear, calMonth]);
+
+  // [수정 4] 달력 날짜 클릭 핸들러
+  const handleDayClick = (str, hasPhoto) => {
+    if (selectingFor) {
+      // 선택 모드: 사진 있는 날짜만 선택 가능
+      if (hasPhoto) {
+        if (selectingFor === 'before') setBeforeDate(str);
+        else setAfterDate(str);
+        setSelectingFor(null);
+        setSelectedDate(null);
+      }
+    } else {
+      // 일반 모드: 기록 보기
+      if (hasPhoto || data.goalDate === str) {
+        setSelectedDate(prev => prev === str ? null : str);
+      }
+    }
+  };
+
+  const todayPhotos = data.photos[today] || {};
+  const beforePhotos = beforeDate ? data.photos[beforeDate] : null;
+  const afterPhotos = afterDate ? data.photos[afterDate] : null;
+  const hasComparison = beforePhotos || afterPhotos;
+
+  const countdownLabel = countdown === null ? null
+    : countdown > 0 ? `D-${countdown}`
+    : countdown === 0 ? 'D-Day! 🎉'
+    : `D+${Math.abs(countdown)}`;
+
+  const countdownClass = countdown === null ? '' : countdown <= 0 ? 'achieved' : countdown <= 7 ? 'urgent' : '';
+
+  return (
+    <div>
+      {/* ── HEADER ── */}
+      <div className="header">
+        <div className="header-row">
+          <div className="app-brand">
+            <div className="app-logo">👁️</div>
+            <div>
+              <div className="app-title">눈바디</div>
+              <div className="app-sub">매일 기록하는 나의 변화</div>
+            </div>
+          </div>
+          {countdownLabel && (
+            <div className={`countdown-badge ${countdownClass}`}
+              onClick={() => setShowGoalModal(true)} title="목표일 변경">
+              {countdownLabel}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── GOAL BAR ── */}
+      <div className="goal-bar">
+        <div className="goal-bar-left">
+          <span className="goal-emoji">🎯</span>
+          <div className="goal-info">
+            <div className="goal-label">목표일</div>
+            {data.goalDate
+              ? <div className="goal-date-val">{fmt(data.goalDate)}</div>
+              : <div className="goal-date-val" style={{ color: 'var(--text-muted)' }}>설정되지 않음</div>
+            }
+          </div>
+        </div>
+        {data.goalDate
+          ? <button className="btn-change" onClick={() => setShowGoalModal(true)}>변경</button>
+          : <button className="btn-set-goal" onClick={() => setShowGoalModal(true)}>목표일 설정</button>
+        }
+      </div>
+
+      {/* ── UPLOAD SECTION ── */}
+      <div className="section">
+        <div className="section-title">
+          📸 오늘의 눈바디
+          <span className="badge">
+            {Object.values(todayPhotos).filter(Boolean).length === 0 ? '미완료'
+              : Object.values(todayPhotos).filter(Boolean).length === 2 ? '완료 ✓' : '1/2'}
+          </span>
+        </div>
+        <div className="upload-card-wrapper">
+          <div className="upload-date-row">
+            <span className="upload-date-label">촬영 날짜</span>
+            <span className="upload-date-val">{fmt(today)}</span>
+          </div>
+          <div className="upload-grid">
+            {/* Front */}
+            <div className={`upload-zone ${todayPhotos.front ? 'has-photo' : ''}`}
+              onClick={() => frontRef.current?.click()}>
+              {todayPhotos.front
+                ? (<><img src={todayPhotos.front} alt="정면" className="preview-img" />
+                    <div className="photo-overlay"><span className="re-upload-label">📷 다시 찍기</span></div></>)
+                : (<div className="upload-placeholder">
+                    <div className="upload-plus">+</div>
+                    <div className="upload-type-label">정면</div>
+                    <div className="upload-hint">탭하여 업로드</div>
+                  </div>)}
+              <input ref={frontRef} type="file" accept="image/*" style={{ display: 'none' }}
+                onChange={e => { handleUpload('front', e.target.files[0]); e.target.value = ''; }} />
+            </div>
+            {/* Side */}
+            <div className={`upload-zone ${todayPhotos.side ? 'has-photo' : ''}`}
+              onClick={() => sideRef.current?.click()}>
+              {todayPhotos.side
+                ? (<><img src={todayPhotos.side} alt="측면" className="preview-img" />
+                    <div className="photo-overlay"><span className="re-upload-label">📷 다시 찍기</span></div></>)
+                : (<div className="upload-placeholder">
+                    <div className="upload-plus">+</div>
+                    <div className="upload-type-label">측면</div>
+                    <div className="upload-hint">탭하여 업로드</div>
+                  </div>)}
+              <input ref={sideRef} type="file" accept="image/*" style={{ display: 'none' }}
+                onChange={e => { handleUpload('side', e.target.files[0]); e.target.value = ''; }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── CALENDAR SECTION ── */}
+      <div className="section">
+        <div className="section-title">
+          📅 기록 캘린더
+          {data.goalDate && countdown !== null && (
+            <span className="badge">
+              {countdown > 0 ? `${countdown}일 남음` : countdown === 0 ? 'D-Day' : `${Math.abs(countdown)}일 지남`}
+            </span>
+          )}
+        </div>
+        <div className="calendar-card">
+          {/* [수정 4] 선택 모드 배너 */}
+          {selectingFor && (
+            <div className="select-mode-banner">
+              <div className="select-mode-text">
+                <span className={`select-mode-badge ${selectingFor}`}>
+                  {selectingFor === 'before' ? 'BEFORE' : 'AFTER'}
+                </span>
+                <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>사진이 있는 날짜를 선택하세요</span>
+              </div>
+              <button className="btn-cancel-select" onClick={() => setSelectingFor(null)}>취소</button>
+            </div>
+          )}
+
+          <div className="cal-header">
+            <button className="cal-nav" onClick={prevMonth}>‹</button>
+            <span className="cal-title">{calYear}년 {calMonth + 1}월</span>
+            <button className="cal-nav" onClick={nextMonth}>›</button>
+          </div>
+          <div className="cal-weekdays">
+            {WEEKDAYS.map(w => <div key={w} className="cal-weekday">{w}</div>)}
+          </div>
+          <div className="cal-grid">
+            {calDays.map((cell, i) => {
+              if (!cell) return <div key={`e${i}`} className="cal-day empty" />;
+              const { d, str } = cell;
+              const hasPhoto = !!data.photos[str];
+              const isGoal = data.goalDate === str;
+              const isToday = str === today;
+              const isSelected = selectedDate === str;
+              const isBeforePick = str === beforeDate;
+              const isAfterPick = str === afterDate;
+              const isSelectable = selectingFor && hasPhoto;
+
+              const cls = [
+                'cal-day',
+                isToday ? 'is-today' : '',
+                isSelected ? 'is-selected' : '',
+                isGoal ? 'is-goal' : '',
+                isSelectable ? 'selectable' : '',
+                !selectingFor && isBeforePick && hasPhoto ? 'is-before-pick' : '',
+                !selectingFor && isAfterPick && hasPhoto ? 'is-after-pick' : '',
+              ].filter(Boolean).join(' ');
+
+              return (
+                <div key={str} className={cls} onClick={() => handleDayClick(str, hasPhoto)}>
+                  <span className="day-num">{d}</span>
+                  <div className="day-dot-row">
+                    {data.photos[str]?.front && <div className="day-dot" style={{ background: 'var(--purple)' }} />}
+                    {data.photos[str]?.side && <div className="day-dot" style={{ background: 'var(--pink)' }} />}
+                  </div>
+                  {isGoal && <div className="goal-flag">🎯</div>}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Selected date panel */}
+          {selectedDate && !selectingFor && (
+            <div className="selected-panel">
+              <div className="selected-panel-title">
+                📌 <strong>{fmt(selectedDate)}</strong> 기록
+              </div>
+              {data.photos[selectedDate]
+                ? <div className="selected-photos-grid">
+                    {['front', 'side'].map(type => (
+                      data.photos[selectedDate][type]
+                        ? <img key={type} src={data.photos[selectedDate][type]}
+                            alt={type === 'front' ? '정면' : '측면'} className="selected-photo" />
+                        : <div key={type} className="selected-no-photo">
+                            {type === 'front' ? '정면 없음' : '측면 없음'}
+                          </div>
+                    ))}
+                  </div>
+                : <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 14, padding: '8px 0' }}>
+                    {selectedDate === data.goalDate ? '🎯 목표일입니다!' : '기록 없음'}
+                  </div>
+              }
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── COMPARISON SECTION ── */}
+      <div className="section">
+        <div className="section-title">💪 Before & After 비교</div>
+        <div className="comparison-card">
+          {hasComparison
+            ? <>
+                {/* [수정 4] Before/After 헤더에 날짜 선택 버튼 */}
+                <div className="comparison-header-row">
+                  <div className="comp-col-label before">
+                    <div className="comp-col-info">
+                      <span className="comp-col-title">BEFORE</span>
+                      <span className="comp-col-date">{beforeDate || '—'}</span>
+                    </div>
+                    <button
+                      className={`btn-pick-date ${selectingFor === 'before' ? 'active-before' : ''}`}
+                      onClick={() => setSelectingFor(prev => prev === 'before' ? null : 'before')}
+                    >
+                      {selectingFor === 'before' ? '취소' : '날짜 선택'}
+                    </button>
+                  </div>
+                  <div className="comp-col-label after">
+                    <div className="comp-col-info">
+                      <span className="comp-col-title">AFTER</span>
+                      <span className="comp-col-date">{afterDate || '—'}</span>
+                    </div>
+                    <button
+                      className={`btn-pick-date ${selectingFor === 'after' ? 'active-after' : ''}`}
+                      onClick={() => setSelectingFor(prev => prev === 'after' ? null : 'after')}
+                    >
+                      {selectingFor === 'after' ? '취소' : '날짜 선택'}
+                    </button>
+                  </div>
+                </div>
+                <div className="comparison-grid">
+                  {/* 정면 row */}
+                  <div className="comp-cell">
+                    {beforePhotos?.front
+                      ? <><img src={beforePhotos.front} alt="처음 정면" /><span className="comp-row-label">정면</span></>
+                      : <div className="comp-cell-empty"><span>📷</span>정면 없음</div>}
+                  </div>
+                  <div className="comp-cell">
+                    {afterPhotos?.front
+                      ? <><img src={afterPhotos.front} alt="현재 정면" /><span className="comp-row-label">정면</span></>
+                      : <div className="comp-cell-empty"><span>📷</span>정면 없음</div>}
+                  </div>
+                  {/* 측면 row */}
+                  <div className="comp-cell">
+                    {beforePhotos?.side
+                      ? <><img src={beforePhotos.side} alt="처음 측면" /><span className="comp-row-label">측면</span></>
+                      : <div className="comp-cell-empty"><span>📷</span>측면 없음</div>}
+                  </div>
+                  <div className="comp-cell">
+                    {afterPhotos?.side
+                      ? <><img src={afterPhotos.side} alt="현재 측면" /><span className="comp-row-label">측면</span></>
+                      : <div className="comp-cell-empty"><span>📷</span>측면 없음</div>}
+                  </div>
+                </div>
+                <div className="comparison-actions">
+                  <button className="btn-primary" onClick={() => setShowDecorate(true)}>✨ 꾸미기 & 저장</button>
+                </div>
+              </>
+            : <div className="empty-comparison">
+                <div className="empty-icon">🏋️</div>
+                <div className="empty-text">사진을 올리면 처음과 현재를<br />한 눈에 비교할 수 있어요!</div>
+                <div className="empty-hint">정면 · 측면 사진 2장을 매일 기록해 보세요</div>
+              </div>
+          }
+        </div>
+      </div>
+
+      <div style={{ height: 24 }} />
+
+      {/* ── MODALS ── */}
+      {showGoalModal && (
+        <GoalModal
+          current={data.goalDate}
+          onSave={goalDate => setData(prev => ({ ...prev, goalDate }))}
+          onClose={() => setShowGoalModal(false)}
+        />
+      )}
+      {showDecorate && (
+        <DecorateModal
+          beforePhotos={beforePhotos}
+          afterPhotos={afterPhotos}
+          beforeDate={beforeDate}
+          afterDate={afterDate}
+          onClose={() => setShowDecorate(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

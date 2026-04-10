@@ -114,8 +114,8 @@
     .header::before { content: ''; position: absolute; top: -60px; right: -60px; width: 200px; height: 200px; background: radial-gradient(circle, var(--purple-glow) 0%, transparent 70%); pointer-events: none; }
     .header-row { display: flex; align-items: center; justify-content: space-between; }
     .app-brand { display: flex; align-items: center; gap: 10px; }
-    .app-logo { width: 42px; height: 42px; background: linear-gradient(135deg, var(--purple), var(--pink)); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
-    .app-title { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+    .app-logo { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
+    .app-title { font-size: 22px; font-weight: 900; letter-spacing: 2px; color: #fff; }
     .app-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
     .countdown-badge { background: linear-gradient(135deg, var(--purple), var(--pink)); padding: 8px 16px; border-radius: 20px; font-size: 18px; font-weight: 800; letter-spacing: -0.5px; box-shadow: 0 4px 20px var(--purple-glow); cursor: pointer; user-select: none; }
     .countdown-badge.urgent { background: linear-gradient(135deg, #ff4444, var(--pink)); animation: pulse 1.5s infinite; }
@@ -368,8 +368,7 @@
   </div>
   <div style="font-size:18px;color:#164e63;font-weight:700;text-align:center;margin-bottom:8px;font-family:-apple-system,sans-serif">EYEBODY</div>
   <div style="font-size:14px;color:#0e7490;text-align:center;margin-bottom:32px;line-height:1.5;font-family:-apple-system,sans-serif">Transform your journey with<br>visual feedback.</div>
-  <button onclick="hideSplash()" style="width:100%;padding:16px;border-radius:50px;background:linear-gradient(90deg,#0891b2,#0e9488);border:none;color:#fff;font-size:16px;font-weight:800;letter-spacing:1.5px;cursor:pointer;box-shadow:0 6px 24px rgba(8,145,178,0.4);margin-bottom:12px;font-family:-apple-system,sans-serif">GET STARTED</button>
-  <button onclick="hideSplash()" style="width:100%;padding:15px;border-radius:50px;background:transparent;border:2px solid #0891b2;color:#0891b2;font-size:16px;font-weight:800;letter-spacing:1.5px;cursor:pointer;font-family:-apple-system,sans-serif">LOG IN</button>
+  <button onclick="hideSplash()" style="width:100%;padding:16px;border-radius:50px;background:linear-gradient(90deg,#0891b2,#0e9488);border:none;color:#fff;font-size:16px;font-weight:800;letter-spacing:1.5px;cursor:pointer;box-shadow:0 6px 24px rgba(8,145,178,0.4);font-family:-apple-system,sans-serif">GET STARTED</button>
 </div>
 <script>
   var _splashTimer = setTimeout(hideSplash, 2500);
@@ -856,8 +855,7 @@ function SplashScreen({ onDone }) {
       <div className="splash-tagline">EYEBODY</div>
       <div className="splash-sub">Transform your journey with<br />visual feedback.</div>
 
-      <button className="splash-btn-primary">GET STARTED</button>
-      <button className="splash-btn-secondary">LOG IN</button>
+      <button className="splash-btn-primary" onClick={onDone}>GET STARTED</button>
     </div>
   );
 }
@@ -916,6 +914,7 @@ function GoalModal({ current, onSave, onClose }) {
 // ── App ────────────────────────────────────────────────────
 function App() {
   const [showSplash, setShowSplash]   = useState(true);
+  const [showAbout,  setShowAbout]    = useState(false);
   const [data, setData]           = useState(load);
   const [calYear, setCalYear]     = useState(() => new Date().getFullYear());
   const [calMonth, setCalMonth]   = useState(() => new Date().getMonth());
@@ -1002,8 +1001,10 @@ function App() {
       <div className="header">
         <div className="header-row">
           <div className="app-brand">
-            <div className="app-logo">👁️</div>
-            <div><div className="app-title">눈바디</div><div className="app-sub">매일 기록하는 나의 변화</div></div>
+            <div className="app-logo">
+              <EyeLogo size={42} />
+            </div>
+            <div><div className="app-title">EYEBODY</div><div className="app-sub">매일 기록하는 나의 변화</div></div>
           </div>
           {countdownLabel && (
             <div className={`countdown-badge ${countdownClass}`} onClick={() => setShowGoalModal(true)}>{countdownLabel}</div>
@@ -1176,13 +1177,42 @@ function App() {
         </div>
       </div>
 
-      {/* ABOUT */}
-      <div className="section">
-        <div className="section-title">ℹ️ EYEBODY 소개</div>
-        <AboutSection />
+      {/* ABOUT LINK */}
+      <div style={{ margin: '4px 16px 0', textAlign: 'center' }}>
+        <button
+          onClick={() => setShowAbout(true)}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: 'var(--text-muted)', fontSize: 13,
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            padding: '12px 0', textDecoration: 'underline', textDecorationColor: 'var(--border)',
+          }}
+        >
+          ℹ️ EYEBODY 소개
+        </button>
       </div>
 
       <div style={{ height: 24 }} />
+
+      {showAbout && (
+        <div className="modal-overlay" onClick={() => setShowAbout(false)}>
+          <div className="modal" style={{ maxHeight: '90vh', overflowY: 'auto', paddingBottom: 40 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:12, marginBottom:20 }}>
+              <EyeLogo size={40} />
+              <div style={{ fontSize:22, fontWeight:900, letterSpacing:2, color:'#fff' }}>EYEBODY</div>
+            </div>
+            <div style={{ fontSize:13, color:'var(--text-dim)', textAlign:'center', marginBottom:24, lineHeight:1.6 }}>
+              Transform your journey with visual feedback.
+            </div>
+            <AboutSection />
+            <button
+              onClick={() => setShowAbout(false)}
+              style={{ width:'100%', marginTop:24, background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:'13px', color:'var(--text-dim)', fontSize:15, cursor:'pointer' }}
+            >닫기</button>
+          </div>
+        </div>
+      )}
 
       {showGoalModal && (
         <GoalModal current={data.goalDate} onSave={goalDate => setData(prev => ({ ...prev, goalDate }))} onClose={() => setShowGoalModal(false)} />

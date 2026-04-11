@@ -385,10 +385,132 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-// ── Storage ────────────────────────────────────────────────
-const KEY = 'nunbody_v1';
-const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || { goalDate: null, photos: {} }; } catch { return { goalDate: null, photos: {} }; } };
-const save = (d) => { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch(e) { console.warn('저장 실패', e); } };
+// ── IndexedDB Storage ──────────────────────────────────────
+const DB_NAME = 'eyebody_db';
+const DB_VER  = 1;
+const STORE_META   = 'meta';    // goalDate, etc.
+const STORE_PHOTOS = 'photos';  // key: "YYYY-MM-DD_front" / "YYYY-MM-DD_side", value: Blob
+
+let _db = null;
+
+function openDB() {
+  if (_db) return Promise.resolve(_db);
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_META))   db.createObjectStore(STORE_META);
+      if (!db.objectStoreNames.contains(STORE_PHOTOS)) db.createObjectStore(STORE_PHOTOS);
+    };
+    req.onsuccess = e => { _db = e.target.result; res(_db); };
+    req.onerror   = e => rej(e.target.error);
+  });
+}
+
+function dbGet(store, key) {
+  return openDB().then(db => new Promise((res, rej) => {
+    const tx  = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = () => res(req.result);
+    req.onerror   = () => rej(req.error);
+  }));
+}
+
+function dbPut(store, key, value) {
+  return openDB().then(db => new Promise((res, rej) => {
+    const tx  = db.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).put(value, key);
+    req.onsuccess = () => res();
+    req.onerror   = () => rej(req.error);
+  }));
+}
+
+function dbDel(store, key) {
+  return openDB().then(db => new Promise((res, rej) => {
+    const tx  = db.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).delete(key);
+    req.onsuccess = () => res();
+    req.onerror   = () => rej(req.error);
+  }));
+}
+
+function dbGetAllKeys(store) {
+  return openDB().then(db => new Promise((res, rej) => {
+    const tx  = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAllKeys();
+    req.onsuccess = () => res(req.result);
+    req.onerror   = () => rej(req.error);
+  }));
+}
+
+function dbClearAll() {
+  return openDB().then(db => new Promise((res, rej) => {
+    const tx = db.transaction([STORE_META, STORE_PHOTOS], 'readwrite');
+    tx.objectStore(STORE_META).clear();
+    tx.objectStore(STORE_PHOTOS).clear();
+    tx.oncomplete = () => res();
+    tx.onerror    = () => rej(tx.error);
+  }));
+}
+
+// blob → dataURL for display
+function blobToDataURL(blob) {
+  return new Promise(res => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.readAsDataURL(blob);
+  });
+}
+
+// dataURL → blob
+function dataURLToBlob(dataURL) {
+  const [header, data] = dataURL.split(',');
+  const mime = header.match(/:(.*?);/)[1];
+  const bytes = atob(data);
+  const arr = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+// Load all meta + photo keys → build app state
+async function loadAll() {
+  const goalDate   = await dbGet(STORE_META, 'goalDate') || null;
+  const photoKeys  = await dbGetAllKeys(STORE_PHOTOS);
+  // photoKeys like "2026-04-11_front"
+  const photoDates = {};
+  for (const k of photoKeys) {
+    const [date, type] = k.split('_');
+    if (!photoDates[date]) photoDates[date] = {};
+    photoDates[date][type] = null; // placeholder; load lazily
+  }
+  return { goalDate, photos: photoDates };
+}
+
+// Save goalDate
+async function saveGoalDate(v) { await dbPut(STORE_META, 'goalDate', v); }
+
+// Save photo (file → compress → blob → IDB)
+async function savePhoto(dateStr, type, file) {
+  const compressed = await compressImageToBlob(file);
+  await dbPut(STORE_PHOTOS, `${dateStr}_${type}`, compressed);
+}
+
+// Delete one photo
+async function deletePhoto(dateStr, type) { await dbDel(STORE_PHOTOS, `${dateStr}_${type}`); }
+
+// Load photo blob → dataURL (for display)
+async function loadPhotoURL(dateStr, type) {
+  const blob = await dbGet(STORE_PHOTOS, `${dateStr}_${type}`);
+  if (!blob) return null;
+  return blobToDataURL(blob);
+}
+
+// Storage usage estimate
+async function getStorageEstimate() {
+  if (!navigator.storage || !navigator.storage.estimate) return null;
+  const est = await navigator.storage.estimate();
+  return { used: est.usage || 0, quota: est.quota || 0 };
+}
 
 // ── Helpers ────────────────────────────────────────────────
 const toDateStr = (d) => { const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0'); const day = String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; };
@@ -399,6 +521,7 @@ const WEEKDAYS = ['일','월','화','수','목','금','토'];
 const fmt = (str) => { if (!str) return ''; const [y, m, d] = str.split('-'); return `${y}년 ${parseInt(m)}월 ${parseInt(d)}일`; };
 
 // ── Image compression ──────────────────────────────────────
+// Returns dataURL (used by DecorateModal canvas)
 const compressImage = (file, maxPx = 900, quality = 0.78) => new Promise((resolve) => {
   const reader = new FileReader();
   reader.onload = (e) => {
@@ -419,6 +542,30 @@ const compressImage = (file, maxPx = 900, quality = 0.78) => new Promise((resolv
   };
   reader.readAsDataURL(file);
 });
+
+// Returns Blob (for IndexedDB storage)
+function compressImageToBlob(file, maxPx = 1200, quality = 0.82) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width: w, height: h } = img;
+        if (Math.max(w, h) > maxPx) {
+          if (w > h) { h = Math.round(h * maxPx / w); w = maxPx; }
+          else { w = Math.round(w * maxPx / h); h = maxPx; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        canvas.toBlob(blob => resolve(blob), 'image/jpeg', quality);
+      };
+      img.onerror = () => resolve(file); // fallback: original
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 // ── Constants ──────────────────────────────────────────────
 const FONTS = [
@@ -896,6 +1043,94 @@ function AboutSection() {
   );
 }
 
+// ── StorageModal ────────────────────────────────────────────
+function StorageModal({ onClose, onDeleteAll }) {
+  const [usage, setUsage] = React.useState(null);
+  const [confirm, setConfirm] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+
+  React.useEffect(() => {
+    if (navigator.storage && navigator.storage.estimate) {
+      navigator.storage.estimate().then(est => setUsage(est));
+    }
+  }, []);
+
+  function fmtBytes(bytes) {
+    if (bytes == null) return '알 수 없음';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    await onDeleteAll();
+    setDeleting(false);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{maxWidth:360}} onClick={e => e.stopPropagation()}>
+        <div className="modal-handle" />
+        <h3 style={{margin:'0 0 16px',fontSize:17,fontWeight:700}}>💾 저장공간 관리</h3>
+
+        <div style={{background:'#f5f5f5',borderRadius:12,padding:'14px 16px',marginBottom:16}}>
+          <div style={{fontSize:13,color:'#888',marginBottom:6}}>현재 사용량</div>
+          {usage ? (
+            <>
+              <div style={{fontSize:22,fontWeight:700,color:'#222'}}>
+                {fmtBytes(usage.usage)}
+              </div>
+              {usage.quota && (
+                <div style={{fontSize:12,color:'#aaa',marginTop:4}}>
+                  최대 {fmtBytes(usage.quota)} 중
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{fontSize:14,color:'#aaa'}}>측정 중...</div>
+          )}
+        </div>
+
+        <div style={{background:'#fffbe6',border:'1px solid #ffe58f',borderRadius:10,padding:'10px 14px',marginBottom:20,fontSize:12,color:'#7a6a00',lineHeight:1.6}}>
+          📱 사진 데이터는 이 기기의 브라우저에만 저장됩니다. 브라우저를 변경하거나 데이터를 삭제하면 복구할 수 없습니다.
+        </div>
+
+        {!confirm ? (
+          <button
+            onClick={() => setConfirm(true)}
+            style={{width:'100%',padding:'13px',background:'#ff4d4f',color:'#fff',border:'none',borderRadius:12,fontSize:15,fontWeight:600,cursor:'pointer'}}
+          >
+            모든 데이터 삭제
+          </button>
+        ) : (
+          <div style={{border:'1px solid #ffccc7',borderRadius:12,padding:16,textAlign:'center'}}>
+            <p style={{margin:'0 0 14px',fontSize:14,color:'#cf1322',fontWeight:600}}>
+              정말 삭제하시겠어요?<br/>
+              <span style={{fontWeight:400,color:'#888'}}>모든 사진과 설정이 영구 삭제됩니다.</span>
+            </p>
+            <div style={{display:'flex',gap:10}}>
+              <button
+                onClick={() => setConfirm(false)}
+                style={{flex:1,padding:'11px',background:'#f0f0f0',border:'none',borderRadius:10,fontSize:14,cursor:'pointer'}}
+              >취소</button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{flex:1,padding:'11px',background:'#ff4d4f',color:'#fff',border:'none',borderRadius:10,fontSize:14,fontWeight:600,cursor:'pointer'}}
+              >{deleting ? '삭제 중...' : '삭제'}</button>
+            </div>
+          </div>
+        )}
+
+        <button onClick={onClose} style={{width:'100%',marginTop:12,padding:'13px',background:'#f0f0f0',border:'none',borderRadius:12,fontSize:15,cursor:'pointer'}}>
+          닫기
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── GoalModal ──────────────────────────────────────────────
 function GoalModal({ current, onSave, onClose }) {
   const [val, setVal] = useState(current || today);
@@ -913,50 +1148,119 @@ function GoalModal({ current, onSave, onClose }) {
 
 // ── App ────────────────────────────────────────────────────
 function App() {
-  const [showSplash, setShowSplash]   = useState(true);
-  const [showAbout,  setShowAbout]    = useState(false);
-  const [data, setData]           = useState(load);
-  const [calYear, setCalYear]     = useState(() => new Date().getFullYear());
-  const [calMonth, setCalMonth]   = useState(() => new Date().getMonth());
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [showGoalModal, setShowGoalModal]   = useState(false);
-  const [showDecorate,  setShowDecorate]    = useState(false);
-  const [beforeDate, setBeforeDate]         = useState(null);
-  const [afterDate,  setAfterDate]          = useState(null);
-  const [selectingFor, setSelectingFor]     = useState(null);
+  const [showSplash,    setShowSplash]    = useState(true);
+  const [showAbout,     setShowAbout]     = useState(false);
+  const [showStorage,   setShowStorage]   = useState(false);
+  const [goalDate,      setGoalDateState] = useState(null);
+  // photoDates: { "2026-04-11": { front: true/false, side: true/false } }
+  const [photoDates,    setPhotoDates]    = useState({});
+  // photoURLs: { "2026-04-11_front": dataURL, ... } — loaded on demand
+  const [photoURLs,     setPhotoURLs]     = useState({});
+  const [dbReady,       setDbReady]       = useState(false);
+
+  const [calYear,       setCalYear]       = useState(() => new Date().getFullYear());
+  const [calMonth,      setCalMonth]      = useState(() => new Date().getMonth());
+  const [selectedDate,  setSelectedDate]  = useState(null);
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [showDecorate,  setShowDecorate]  = useState(false);
+  const [beforeDate,    setBeforeDate]    = useState(null);
+  const [afterDate,     setAfterDate]     = useState(null);
+  const [selectingFor,  setSelectingFor]  = useState(null);
 
   const frontRef = useRef(null);
   const sideRef  = useRef(null);
 
-  useEffect(() => { save(data); }, [data]);
+  // ── Boot: load from IndexedDB ────────────────────────────
+  useEffect(() => {
+    loadAll().then(({ goalDate: gd, photos }) => {
+      setGoalDateState(gd);
+      setPhotoDates(photos);
+      setDbReady(true);
+    }).catch(err => {
+      console.warn('IndexedDB load failed', err);
+      setDbReady(true);
+    });
+  }, []);
 
-  const photoDatesSorted = useMemo(() => Object.keys(data.photos).sort(), [data.photos]);
+  // ── Load photo URL on demand ─────────────────────────────
+  const ensurePhotoURL = useCallback(async (dateStr, type) => {
+    const key = `${dateStr}_${type}`;
+    if (photoURLs[key]) return photoURLs[key];
+    const url = await loadPhotoURL(dateStr, type);
+    if (url) setPhotoURLs(prev => ({ ...prev, [key]: url }));
+    return url;
+  }, [photoURLs]);
+
+  const getPhotoURL = (dateStr, type) => photoURLs[`${dateStr}_${type}`] || null;
+
+  // ── Before/After auto-default ────────────────────────────
+  const photoDatesSorted = useMemo(() => Object.keys(photoDates).sort(), [photoDates]);
 
   useEffect(() => {
     if (photoDatesSorted.length === 0) { setBeforeDate(null); setAfterDate(null); return; }
     const first = photoDatesSorted[0];
     const last  = photoDatesSorted[photoDatesSorted.length - 1];
-    setBeforeDate(prev => prev && data.photos[prev] ? prev : first);
-    setAfterDate(prev  => prev && data.photos[prev] ? prev : last);
+    setBeforeDate(prev => prev && photoDates[prev] ? prev : first);
+    setAfterDate(prev  => prev && photoDates[prev] ? prev : last);
   }, [photoDatesSorted]);
 
+  // ── Load URLs when comparison dates change ───────────────
+  useEffect(() => {
+    if (beforeDate) { ensurePhotoURL(beforeDate,'front'); ensurePhotoURL(beforeDate,'side'); }
+    if (afterDate)  { ensurePhotoURL(afterDate,'front');  ensurePhotoURL(afterDate,'side');  }
+  }, [beforeDate, afterDate]);
+
+  useEffect(() => {
+    if (selectedDate) { ensurePhotoURL(selectedDate,'front'); ensurePhotoURL(selectedDate,'side'); }
+  }, [selectedDate]);
+
+  useEffect(() => {
+    ensurePhotoURL(today,'front'); ensurePhotoURL(today,'side');
+  }, [photoDates]);
+
+  // ── Countdown ────────────────────────────────────────────
   const countdown = useMemo(() => {
-    if (!data.goalDate) return null;
-    const goal = new Date(data.goalDate + 'T00:00:00');
+    if (!goalDate) return null;
+    const goal = new Date(goalDate + 'T00:00:00');
     const now  = new Date(today + 'T00:00:00');
     return Math.round((goal - now) / 86400000);
-  }, [data.goalDate]);
+  }, [goalDate]);
 
+  // ── Upload ───────────────────────────────────────────────
   const handleUpload = async (type, file) => {
     if (!file) return;
-    const compressed = await compressImage(file);
-    setData(prev => {
-      const photos = { ...prev.photos };
-      photos[today] = { ...(photos[today] || {}), [type]: compressed };
-      return { ...prev, photos };
-    });
+    await savePhoto(today, type, file);
+    const url = await loadPhotoURL(today, type);
+    setPhotoDates(prev => ({
+      ...prev,
+      [today]: { ...(prev[today] || {}), [type]: true }
+    }));
+    if (url) setPhotoURLs(prev => ({ ...prev, [`${today}_${type}`]: url }));
   };
 
+  // ── Goal date ────────────────────────────────────────────
+  const handleSaveGoal = async (d) => {
+    await saveGoalDate(d);
+    setGoalDateState(d);
+  };
+
+  // ── Delete single photo ──────────────────────────────────
+  const handleDeletePhoto = async (dateStr, type) => {
+    await deletePhoto(dateStr, type);
+    setPhotoDates(prev => {
+      const d = { ...prev };
+      if (d[dateStr]) {
+        const updated = { ...d[dateStr] };
+        delete updated[type];
+        if (Object.keys(updated).length === 0) delete d[dateStr];
+        else d[dateStr] = updated;
+      }
+      return d;
+    });
+    setPhotoURLs(prev => { const u = { ...prev }; delete u[`${dateStr}_${type}`]; return u; });
+  };
+
+  // ── Calendar ─────────────────────────────────────────────
   const prevMonth = () => { if (calMonth === 0) { setCalYear(y => y-1); setCalMonth(11); } else setCalMonth(m => m-1); };
   const nextMonth = () => { if (calMonth === 11) { setCalYear(y => y+1); setCalMonth(0); }  else setCalMonth(m => m+1); };
 
@@ -980,17 +1284,25 @@ function App() {
         setSelectingFor(null); setSelectedDate(null);
       }
     } else {
-      if (hasPhoto || data.goalDate === str) setSelectedDate(prev => prev === str ? null : str);
+      if (hasPhoto || goalDate === str) setSelectedDate(prev => prev === str ? null : str);
     }
   };
 
-  const todayPhotos  = data.photos[today] || {};
-  const beforePhotos = beforeDate ? data.photos[beforeDate] : null;
-  const afterPhotos  = afterDate  ? data.photos[afterDate]  : null;
-  const hasComparison = beforePhotos || afterPhotos;
+  // ── Photo helpers ────────────────────────────────────────
+  const todayInfo    = photoDates[today] || {};
+  const beforePhotos = beforeDate ? { front: getPhotoURL(beforeDate,'front'), side: getPhotoURL(beforeDate,'side') } : null;
+  const afterPhotos  = afterDate  ? { front: getPhotoURL(afterDate,'front'),  side: getPhotoURL(afterDate,'side')  } : null;
+  const hasComparison = beforeDate && photoDates[beforeDate] || afterDate && photoDates[afterDate];
 
   const countdownLabel = countdown === null ? null : countdown > 0 ? `D-${countdown}` : countdown === 0 ? 'D-Day! 🎉' : `D+${Math.abs(countdown)}`;
   const countdownClass = countdown === null ? '' : countdown <= 0 ? 'achieved' : countdown <= 7 ? 'urgent' : '';
+
+  if (!dbReady) return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', flexDirection:'column', gap:16 }}>
+      <div style={{ fontSize:40 }}><EyeLogo size={56} /></div>
+      <div style={{ color:'var(--text-dim)', fontSize:14 }}>불러오는 중...</div>
+    </div>
+  );
 
   return (
     <div>
@@ -1001,14 +1313,15 @@ function App() {
       <div className="header">
         <div className="header-row">
           <div className="app-brand">
-            <div className="app-logo">
-              <EyeLogo size={42} />
-            </div>
+            <div className="app-logo"><EyeLogo size={42} /></div>
             <div><div className="app-title">EYEBODY</div><div className="app-sub">매일 기록하는 나의 변화</div></div>
           </div>
-          {countdownLabel && (
-            <div className={`countdown-badge ${countdownClass}`} onClick={() => setShowGoalModal(true)}>{countdownLabel}</div>
-          )}
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            {countdownLabel && (
+              <div className={`countdown-badge ${countdownClass}`} onClick={() => setShowGoalModal(true)}>{countdownLabel}</div>
+            )}
+            <button onClick={() => setShowStorage(true)} style={{ background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:10, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:18 }} title="저장공간 관리">⚙️</button>
+          </div>
         </div>
       </div>
 
@@ -1018,13 +1331,13 @@ function App() {
           <span className="goal-emoji">🎯</span>
           <div className="goal-info">
             <div className="goal-label">목표일</div>
-            {data.goalDate
-              ? <div className="goal-date-val">{fmt(data.goalDate)}</div>
-              : <div className="goal-date-val" style={{ color: 'var(--text-muted)' }}>설정되지 않음</div>
+            {goalDate
+              ? <div className="goal-date-val">{fmt(goalDate)}</div>
+              : <div className="goal-date-val" style={{ color:'var(--text-muted)' }}>설정되지 않음</div>
             }
           </div>
         </div>
-        {data.goalDate
+        {goalDate
           ? <button className="btn-change" onClick={() => setShowGoalModal(true)}>변경</button>
           : <button className="btn-set-goal" onClick={() => setShowGoalModal(true)}>목표일 설정</button>
         }
@@ -1034,7 +1347,9 @@ function App() {
       <div className="section">
         <div className="section-title">
           📸 오늘의 눈바디
-          <span className="badge">{Object.values(todayPhotos).filter(Boolean).length === 0 ? '미완료' : Object.values(todayPhotos).filter(Boolean).length === 2 ? '완료 ✓' : '1/2'}</span>
+          <span className="badge">
+            {!todayInfo.front && !todayInfo.side ? '미완료' : todayInfo.front && todayInfo.side ? '완료 ✓' : '1/2'}
+          </span>
         </div>
         <div className="upload-card-wrapper">
           <div className="upload-date-row">
@@ -1042,20 +1357,19 @@ function App() {
             <span className="upload-date-val">{fmt(today)}</span>
           </div>
           <div className="upload-grid">
-            <div className={`upload-zone${todayPhotos.front ? ' has-photo' : ''}`} onClick={() => frontRef.current?.click()}>
-              {todayPhotos.front
-                ? (<><img src={todayPhotos.front} alt="정면" className="preview-img" /><div className="photo-overlay"><span className="re-upload-label">📷 다시 찍기</span></div></>)
-                : (<div className="upload-placeholder"><div className="upload-plus">+</div><div className="upload-type-label">정면</div><div className="upload-hint">탭하여 업로드</div></div>)
-              }
-              <input ref={frontRef} type="file" accept="image/*" style={{ display:'none' }} onChange={e => { handleUpload('front', e.target.files[0]); e.target.value=''; }} />
-            </div>
-            <div className={`upload-zone${todayPhotos.side ? ' has-photo' : ''}`} onClick={() => sideRef.current?.click()}>
-              {todayPhotos.side
-                ? (<><img src={todayPhotos.side} alt="측면" className="preview-img" /><div className="photo-overlay"><span className="re-upload-label">📷 다시 찍기</span></div></>)
-                : (<div className="upload-placeholder"><div className="upload-plus">+</div><div className="upload-type-label">측면</div><div className="upload-hint">탭하여 업로드</div></div>)
-              }
-              <input ref={sideRef} type="file" accept="image/*" style={{ display:'none' }} onChange={e => { handleUpload('side', e.target.files[0]); e.target.value=''; }} />
-            </div>
+            {['front','side'].map(type => {
+              const url = getPhotoURL(today, type);
+              return (
+                <div key={type} className={`upload-zone${url ? ' has-photo' : ''}`} onClick={() => type==='front' ? frontRef.current?.click() : sideRef.current?.click()}>
+                  {url
+                    ? (<><img src={url} alt={type} className="preview-img" /><div className="photo-overlay"><span className="re-upload-label">📷 다시 찍기</span></div></>)
+                    : (<div className="upload-placeholder"><div className="upload-plus">+</div><div className="upload-type-label">{type==='front'?'정면':'측면'}</div><div className="upload-hint">탭하여 업로드</div></div>)
+                  }
+                </div>
+              );
+            })}
+            <input ref={frontRef} type="file" accept="image/*" style={{ display:'none' }} onChange={e => { handleUpload('front', e.target.files[0]); e.target.value=''; }} />
+            <input ref={sideRef}  type="file" accept="image/*" style={{ display:'none' }} onChange={e => { handleUpload('side',  e.target.files[0]); e.target.value=''; }} />
           </div>
         </div>
       </div>
@@ -1064,7 +1378,7 @@ function App() {
       <div className="section">
         <div className="section-title">
           📅 기록 캘린더
-          {data.goalDate && countdown !== null && (
+          {goalDate && countdown !== null && (
             <span className="badge">{countdown > 0 ? `${countdown}일 남음` : countdown === 0 ? 'D-Day' : `${Math.abs(countdown)}일 지남`}</span>
           )}
         </div>
@@ -1088,8 +1402,8 @@ function App() {
             {calDays.map((cell, i) => {
               if (!cell) return <div key={`e${i}`} className="cal-day empty" />;
               const { d, str } = cell;
-              const hasPhoto = !!data.photos[str];
-              const isGoal   = data.goalDate === str;
+              const hasPhoto = !!photoDates[str];
+              const isGoal   = goalDate === str;
               const isToday  = str === today;
               const isSel    = selectedDate === str;
               const cls = ['cal-day', isToday ? 'is-today' : '', isSel ? 'is-selected' : '', isGoal ? 'is-goal' : '',
@@ -1101,8 +1415,8 @@ function App() {
                 <div key={str} className={cls} onClick={() => handleDayClick(str, hasPhoto)}>
                   <span className="day-num">{d}</span>
                   <div className="day-dot-row">
-                    {data.photos[str]?.front && <div className="day-dot" style={{ background:'var(--purple)' }} />}
-                    {data.photos[str]?.side  && <div className="day-dot" style={{ background:'var(--pink)' }} />}
+                    {photoDates[str]?.front && <div className="day-dot" style={{ background:'var(--purple)' }} />}
+                    {photoDates[str]?.side  && <div className="day-dot" style={{ background:'var(--pink)' }} />}
                   </div>
                   {isGoal && <div className="goal-flag">🎯</div>}
                 </div>
@@ -1112,16 +1426,17 @@ function App() {
           {selectedDate && !selectingFor && (
             <div className="selected-panel">
               <div className="selected-panel-title">📌 <strong>{fmt(selectedDate)}</strong> 기록</div>
-              {data.photos[selectedDate]
+              {photoDates[selectedDate]
                 ? <div className="selected-photos-grid">
-                    {['front','side'].map(type => (
-                      data.photos[selectedDate][type]
-                        ? <img key={type} src={data.photos[selectedDate][type]} alt={type} className="selected-photo" />
-                        : <div key={type} className="selected-no-photo">{type === 'front' ? '정면 없음' : '측면 없음'}</div>
-                    ))}
+                    {['front','side'].map(type => {
+                      const url = getPhotoURL(selectedDate, type);
+                      return url
+                        ? <img key={type} src={url} alt={type} className="selected-photo" />
+                        : <div key={type} className="selected-no-photo">{type==='front'?'정면 없음':'측면 없음'}</div>;
+                    })}
                   </div>
                 : <div style={{ textAlign:'center', color:'var(--text-muted)', fontSize:14, padding:'8px 0' }}>
-                    {selectedDate === data.goalDate ? '🎯 목표일입니다!' : '기록 없음'}
+                    {selectedDate === goalDate ? '🎯 목표일입니다!' : '기록 없음'}
                   </div>
               }
             </div>
@@ -1142,8 +1457,8 @@ function App() {
                     <span className="comp-col-date">{beforeDate || '—'}</span>
                   </div>
                   <button className={`btn-pick-date${selectingFor==='before' ? ' active-before':''}`}
-                    onClick={() => setSelectingFor(prev => prev==='before' ? null : 'before')}>
-                    {selectingFor === 'before' ? '취소' : '날짜 선택'}
+                    onClick={() => setSelectingFor(p => p==='before' ? null : 'before')}>
+                    {selectingFor==='before' ? '취소' : '날짜 선택'}
                   </button>
                 </div>
                 <div className="comp-col-label after">
@@ -1152,16 +1467,16 @@ function App() {
                     <span className="comp-col-date">{afterDate || '—'}</span>
                   </div>
                   <button className={`btn-pick-date${selectingFor==='after' ? ' active-after':''}`}
-                    onClick={() => setSelectingFor(prev => prev==='after' ? null : 'after')}>
-                    {selectingFor === 'after' ? '취소' : '날짜 선택'}
+                    onClick={() => setSelectingFor(p => p==='after' ? null : 'after')}>
+                    {selectingFor==='after' ? '취소' : '날짜 선택'}
                   </button>
                 </div>
               </div>
               <div className="comparison-grid">
-                <div className="comp-cell">{beforePhotos?.front ? <><img src={beforePhotos.front} alt="처음 정면" /><span className="comp-row-label">정면</span></> : <div className="comp-cell-empty"><span>📷</span>정면 없음</div>}</div>
-                <div className="comp-cell">{afterPhotos?.front  ? <><img src={afterPhotos.front}  alt="현재 정면" /><span className="comp-row-label">정면</span></> : <div className="comp-cell-empty"><span>📷</span>정면 없음</div>}</div>
-                <div className="comp-cell">{beforePhotos?.side  ? <><img src={beforePhotos.side}  alt="처음 측면" /><span className="comp-row-label">측면</span></> : <div className="comp-cell-empty"><span>📷</span>측면 없음</div>}</div>
-                <div className="comp-cell">{afterPhotos?.side   ? <><img src={afterPhotos.side}   alt="현재 측면" /><span className="comp-row-label">측면</span></> : <div className="comp-cell-empty"><span>📷</span>측면 없음</div>}</div>
+                {[{p:beforePhotos,l:'처음 정면',t:'정면'},{p:afterPhotos,l:'현재 정면',t:'정면'},{p:beforePhotos,l:'처음 측면',t:'측면'},{p:afterPhotos,l:'현재 측면',t:'측면'}].map((it,i) => {
+                  const src = i<2 ? it.p?.front : it.p?.side;
+                  return <div key={i} className="comp-cell">{src ? <><img src={src} alt={it.l} /><span className="comp-row-label">{it.t}</span></> : <div className="comp-cell-empty"><span>📷</span>{it.t} 없음</div>}</div>;
+                })}
               </div>
               <div className="comparison-actions">
                 <button className="btn-primary" onClick={() => setShowDecorate(true)}>✨ 꾸미기 &amp; 저장</button>
@@ -1177,45 +1492,53 @@ function App() {
         </div>
       </div>
 
-      {/* ABOUT LINK */}
-      <div style={{ margin: '4px 16px 0', textAlign: 'center' }}>
-        <button
-          onClick={() => setShowAbout(true)}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: 'var(--text-muted)', fontSize: 13,
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '12px 0', textDecoration: 'underline', textDecorationColor: 'var(--border)',
-          }}
-        >
+      {/* BOTTOM LINKS */}
+      <div style={{ margin:'4px 16px 0', display:'flex', justifyContent:'center', gap:24 }}>
+        <button onClick={() => setShowAbout(true)}
+          style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', fontSize:13, padding:'12px 0', textDecoration:'underline', textDecorationColor:'var(--border)' }}>
           ℹ️ EYEBODY 소개
         </button>
+        <button onClick={() => setShowStorage(true)}
+          style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', fontSize:13, padding:'12px 0', textDecoration:'underline', textDecorationColor:'var(--border)' }}>
+          💾 저장공간 관리
+        </button>
       </div>
+      <div style={{ height:24 }} />
 
-      <div style={{ height: 24 }} />
-
+      {/* ── MODALS ── */}
       {showAbout && (
         <div className="modal-overlay" onClick={() => setShowAbout(false)}>
-          <div className="modal" style={{ maxHeight: '90vh', overflowY: 'auto', paddingBottom: 40 }} onClick={e => e.stopPropagation()}>
+          <div className="modal" style={{ maxHeight:'90vh', overflowY:'auto', paddingBottom:40 }} onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
             <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:12, marginBottom:20 }}>
               <EyeLogo size={40} />
               <div style={{ fontSize:22, fontWeight:900, letterSpacing:2, color:'#fff' }}>EYEBODY</div>
             </div>
-            <div style={{ fontSize:13, color:'var(--text-dim)', textAlign:'center', marginBottom:24, lineHeight:1.6 }}>
-              Transform your journey with visual feedback.
-            </div>
+            <div style={{ fontSize:13, color:'var(--text-dim)', textAlign:'center', marginBottom:24, lineHeight:1.6 }}>Transform your journey with visual feedback.</div>
             <AboutSection />
-            <button
-              onClick={() => setShowAbout(false)}
-              style={{ width:'100%', marginTop:24, background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:'13px', color:'var(--text-dim)', fontSize:15, cursor:'pointer' }}
-            >닫기</button>
+            <button onClick={() => setShowAbout(false)}
+              style={{ width:'100%', marginTop:24, background:'var(--card)', border:'1px solid var(--border)', borderRadius:12, padding:'13px', color:'var(--text-dim)', fontSize:15, cursor:'pointer' }}>닫기</button>
           </div>
         </div>
       )}
 
+      {showStorage && (
+        <StorageModal
+          onClose={() => setShowStorage(false)}
+          onDeleteAll={async () => {
+            await dbClearAll();
+            setGoalDateState(null);
+            setPhotoDates({});
+            setPhotoURLs({});
+            setBeforeDate(null);
+            setAfterDate(null);
+            setShowStorage(false);
+          }}
+        />
+      )}
+
       {showGoalModal && (
-        <GoalModal current={data.goalDate} onSave={goalDate => setData(prev => ({ ...prev, goalDate }))} onClose={() => setShowGoalModal(false)} />
+        <GoalModal current={goalDate} onSave={handleSaveGoal} onClose={() => setShowGoalModal(false)} />
       )}
       {showDecorate && (
         <DecorateModal beforePhotos={beforePhotos} afterPhotos={afterPhotos} beforeDate={beforeDate} afterDate={afterDate} onClose={() => setShowDecorate(false)} />
